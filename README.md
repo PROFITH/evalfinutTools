@@ -1,133 +1,117 @@
-# evalfinutTools
+# evalfinutTools: Dietary Assessment & NOVA Classification
 
-A comprehensive R package for processing and analyzing dietary intake data exported from the [Evalfinut](https://www.evalfinut.com/) nutritional assessment software.
+**evalfinutTools** is an R package designed to streamline the analysis of 24-hour dietary recalls. It automates the calculation of energy intake and classifies food items according to the **NOVA classification system** (Ultra-Processed Foods), specifically tailored for "Metabol" format exports and BEDCA-based food databases.
 
-This package includes functions to:
+## Features
 
-- Format participant-level nutritional summaries
-- Import and clean food intake records
-- Classify foods by processing level using the **NOVA index**
-- Compute energy intake by meal (e.g. breakfast, lunch, dinner, snacks) and NOVA group
+-   **Automated Import**: Parses complex Excel/CSV recall files with specific "Metabol" headers and metadata.
+-   **NOVA Classification**: Automatically groups foods into NOVA 1 (Unprocessed) through NOVA 4 (Ultra-Processed) using an internal reference database.
+-   **Robust Imputation**: Correctly handles missing meals (e.g., if a participant skips dinner, it records 0 kcal rather than missing data) to ensure statistical consistency.
+-   **Batch Processing**: Analyze hundreds of participant files in a single command with a built-in progress bar.
+-   **Regression-Ready Output**: Returns a "wide" format dataset (one row per participant) ideal for statistical modeling.
 
----
+------------------------------------------------------------------------
 
 ## Installation
 
-Install from local source or from GitHub (if published):
+You can install the package from GitHub:
 
-```r
-# If using devtools
-devtools::install_github("yourusername/evalfinutTools")
-
-# Or from a local folder
-devtools::install_local("path/to/evalfinutTools")
+``` r
+library(remotes)
+remotes::install_github("PROFITH/evalfinutTools")
 ```
 
-# Features
-format_evalfinut_summary()
-Reads .xls summary-by-person exports
+------------------------------------------------------------------------
 
-Cleans and standardizes nutrient column names
+## Usage
 
-Extracts:
+### 1. Processing a Single File
 
-Intake (ingesta)
+If you want to check a specific participant's data:
 
-Recommendations (recomendado)
-
-Differences (diferencia, including ranges)
-
-Outputs a single tidy row per participant
-
-read_food_intake()
-Reads detailed food intake data (multiple rows per participant)
-
-Parses meal types and time of consumption
-
-Prepares data for downstream NOVA classification
-
-classify_nova()
-Classifies each food item into NOVA groups (1–4)
-
-Supports internal or external NOVA mapping tables
-
-calculate_energy_by_meal_and_nova()
-Aggregates energy intake by:
-
-Meal: breakfast, lunch, dinner, snacks
-
-NOVA group: unprocessed to ultra-processed
-
-Outputs a summary per participant
-
-Use Case
-Designed for researchers conducting:
-
-Nutritional epidemiology
-
-Dietary quality analysis
-
-Studies of food processing and health outcomes
-
-📝 Example
-r
-Copiar
-Editar
+``` r
 library(evalfinutTools)
 
-# Format summary file
-summary_df <- format_evalfinut_summary("data/summary_participant1.xls")
+# 1. Import the raw file
+# Separates metadata (Age, Sex, etc.) from the dietary records
+participant_data <- import_recall_data("raw_data/Metabol001.xls")
 
-# Load detailed intake
-intake_df <- read_food_intake("data/intake_participant1.xlsx")
+# 2. Analyze the diet
+# Calculates sums, means, and imputes zeros for skipped meals
+stats <- analyze_diet(participant_data$D)
 
-# Classify foods
-intake_df <- classify_nova(intake_df, nova_table = "data/nova_lookup.csv")
+# 3. View results
+print(stats$total_daily_kcal)
+print(stats$cena_nova4_perc) # % of Dinner calories from UPF
+```
 
-# Calculate energy intake
-energy_summary <- calculate_energy_by_meal_and_nova(intake_df)
-📂 Planned Structure
-kotlin
-Copiar
-Editar
-evalfinutTools/
-├── R/
-│   ├── format_summary.R
-│   ├── read_food_intake.R
-│   ├── classify_nova.R
-│   └── calc_energy_intake.R
-├── data/
-│   └── nova_lookup.csv
-├── man/
-├── DESCRIPTION
-├── NAMESPACE
-├── README.md
-└── tests/
-📄 License
-MIT License. See LICENSE file for details.
+### 2. Batch Processing (Recommended Workflow)
 
-📬 Contact
-For issues, please open an Issue or contact your.email@example.com.
+To analyze an entire study folder containing multiple `.xls` or `.xlsx` files:
 
-yaml
-Copiar
-Editar
+``` r
+library(evalfinutTools)
 
----
+# 1. Import the raw file
+# Separates metadata (Age, Sex, etc.) from the dietary records
+participant_data <- import_recall_data("raw_data/Metabol001.xls")
 
-Let me know if you’d like help:
+# 2. Analyze the diet
+# Calculates sums, means, and imputes zeros for skipped meals
+stats <- analyze_diet(participant_data$D)
 
-- Structuring your `R/` source files
-- Writing stubs or templates for the other functions (`read_food_intake()`, `classify_nova()`, etc.)
-- Creating a sample `nova_lookup.csv` mapping table
-- Setting up unit tests or vignettes
+# 3. View results
+print(stats$total_daily_kcal)
+print(stats$cena_nova4_perc) # % of Dinner calories from UPF
+```
 
-We can gradually build this into a well-structured and publishable package.
+------------------------------------------------------------------------
 
+## Output Data Dictionary
 
+The package produces a "wide" format dataset where each row represents one participant.
 
-alimentos completos.csv
------
-base de datos BEDCA + etiquetas nutricionales de alimentos introducidas a mano
+|  |  |
+|----------------------------|--------------------------------------------|
+| **Column Name** | **Description** |
+| `source_file` | Name of the original input file. |
+| `code` | Participant ID (extracted from file header). |
+| `age`, `sex` | Demographics (extracted from file header). |
+| `total_daily_kcal` | Mean daily energy intake (kcal). |
+| `[meal]_kcal` | Absolute energy for a specific meal (e.g., `almuerzo_kcal`). |
+| `nova[1-4]_kcal` | Energy from specific NOVA groups (e.g., `nova4_kcal` = UPF). |
+| `[meal]_nova[1-4]_perc` | Percentage of that meal's energy coming from that NOVA group. |
 
-"# evalfinutTools" 
+------------------------------------------------------------------------
+
+## Configuration
+
+### Standard Meals
+
+To ensure dataset consistency across participants, the package enforces that the following meal columns always exist (filled with 0 if missing):
+
+-   *Desayuno (Breakfast)*
+
+-   *Media mañana (Mid-morning snack)*
+
+-   *Almuerzo (Lunch)*
+
+-   *Merienda (Afternoon snack)*
+
+-   *Cena (Dinner)*
+
+### Internal Database
+
+The package includes an internal food database (`food_db`) derived from BEDCA plus some manually introduced foods. This database includes:
+
+-   `food_id`: Unique link to recall data.
+
+-   `nova_group`: The pre-assigned NOVA class (1-4).
+
+-   `kcal_per_100g`: Energy density.
+
+------------------------------------------------------------------------
+
+## License
+
+AGPL-3

@@ -1,0 +1,24 @@
+Package: evalfinutTools
+Type: Package
+Title: Tools to Process and Analyze Dietary Intake Data from Evalfinut
+Version: 0.1.0
+Author: Jairo H Migueles [aut, cre]
+Maintainer: Jairo H Migueles <jairo@jhmigueles.com>
+Description: Provides tools for reading and processing dietary intake data exported from Evalfinut.
+  Includes functions for formatting summary-by-person reports, importing detailed food intake data,
+  classifying foods by NOVA processing categories, and calculating energy intake per meal and
+  processing level. Designed for use in nutritional epidemiology and dietary pattern research.
+License: AGPL (>= 3)
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.3.3
+Roxygen: list(markdown = TRUE)
+Imports:
+    data.table
+Suggests:
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+Depends: 
+    R (>= 3.5)
+Config/testthat/edition: 3
