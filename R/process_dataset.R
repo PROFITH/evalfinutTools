@@ -87,7 +87,7 @@ process_dataset <- function(folder_path, output_csv = "diet.csv") {
       # C. Add Metadata
       # It's useful to know which filename this data came from
       flat_row <- flat_row %>%
-        mutate(source_file = basename(file), .before = 1)
+        mutate(source_file = file, .before = 1)
       
       return(flat_row)
       
