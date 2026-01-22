@@ -10,7 +10,7 @@
 #'   The function searches recursively (i.e., it will find files inside subfolders).
 #' @param output_csv String (Optional). The file path where the final results will be saved.
 #'   Defaults to \code{"diet.csv"}. Set to \code{NULL} to skip saving to disk.
-#'
+#' @param format String. Choose "euro" for Spain/Europe (sep=';', dec=',') or "us" for standard (sep=',', dec='.'). Defaults to "euro".#'
 #' @details
 #' \strong{Workflow:}
 #' \enumerate{
@@ -44,7 +44,7 @@
 #' @importFrom data.table fwrite
 #' @importFrom utils txtProgressBar setTxtProgressBar
 #' @export
-process_dataset <- function(folder_path, output_csv = "diet.csv") {
+process_dataset <- function(folder_path, output_csv = "diet.csv", format = "euro") {
   
   # 1. Get list of files (Case insensitive for .xls, .xlsx, .csv)
   files <- list.files(path = folder_path, pattern = "\\.(xls|xlsx|csv)$", 
@@ -67,6 +67,16 @@ process_dataset <- function(folder_path, output_csv = "diet.csv") {
     # Update the progress bar 
     utils::setTxtProgressBar(pb, i)
     
+    # Helper to create an error row easily
+    create_error_row <- function(status, msg) {
+      dplyr::tibble(
+        source_file = basename(file),
+        processing_status = status,
+        error_message = msg
+        # Other columns (kcal, etc.) will automatically be filled with NA by bind_rows
+      )
+    }
+    
     # Try-catch block prevents one bad file from crashing the whole script
     tryCatch({
       
@@ -75,26 +85,30 @@ process_dataset <- function(folder_path, output_csv = "diet.csv") {
       
       # Check if empty
       if (nrow(raw_data$D) == 0) {
-        warning(paste("Skipping empty file:", basename(file)))
-        return(NULL)
+        return(create_error_row("Skipped", "File contained no food records"))
       }
       
       # B. Analyze
-      # We only care about the 'summary' part (the flat row)
       analysis <- analyze_diet(raw_data$D)
-      flat_row <- cbind(list2DF(raw_data$H, nrow = 1), analysis)
       
       # C. Add Metadata
-      # It's useful to know which filename this data came from
+      flat_row <- cbind(list2DF(raw_data$H, nrow = 1), analysis)
+      
+      # D. Add Audit Columns
       flat_row <- flat_row %>%
-        mutate(source_file = file, .before = 1)
+        mutate(
+          source_file = file, 
+          processing_status = "Success",
+          error_message = NA_character_,
+          .before = 1
+        )
       
       return(flat_row)
       
     }, error = function(e) {
-      # On error, print message and return NULL (skipping row)
-      message(paste("ERROR in file:", basename(file), "-", e$message))
-      return(NULL)
+      # Return a row indicating failure, preserving the error message
+      clean_msg <- gsub("\n", " ", e$message)
+      return(create_error_row("Failed", clean_msg))
     })
   })
   
@@ -102,13 +116,32 @@ process_dataset <- function(folder_path, output_csv = "diet.csv") {
   close(pb)
   
   # 3. Final Summary
-  message(sprintf("\nBatch complete. Successfully processed %d out of %d files.", 
-                  nrow(master_table), length(files)))
+  n_total <- length(files)
+  n_success <- sum(master_table$processing_status == "Success")
+  n_failed <- sum(master_table$processing_status == "Failed")
+  message(sprintf("\nBatch complete. Total: %d | Success: %d | Failed: %d", 
+                  n_total, n_success, n_failed))
   
   # 4. Save to CSV if requested
   if (!is.null(output_csv)) {
-    data.table::fwrite(master_table, output_csv)
+    
+    if (format == "euro") {
+      # European/Spanish Excel: Semicolon separator, Comma decimal
+      write_sep <- ";"
+      write_dec <- ","
+      msg_type <- "European (Excel Spain compatible)"
+    } else {
+      # Standard/US: Comma separator, Dot decimal
+      write_sep <- ","
+      write_dec <- "."
+      msg_type <- "Standard US"
+    }
+    
+    data.table::fwrite(master_table, output_csv, 
+                       sep = write_sep, dec = write_dec)
+    
     message(paste("Results saved to:", output_csv))
+    message(paste("   -> Format used:", msg_type))
   }
   
   invisible(master_table)
