@@ -89,6 +89,10 @@ process_dataset <- function(folder_path, output_csv = "diet.csv", format = "euro
       }
       
       # B. Analyze
+      missing_foods = NULL
+      if (any(!raw_data$D$food_id %in% food_db$id)) {
+        missing_foods = c(missing_foods, raw_data$D$food_id[!raw_data$D$food_id %in% food_db$id])
+      }
       analysis <- analyze_diet(raw_data$D, file = file)
       
       # C. Add Metadata
@@ -99,6 +103,7 @@ process_dataset <- function(folder_path, output_csv = "diet.csv", format = "euro
         mutate(
           source_file = file, 
           processing_status = "Success",
+          missing_foods = paste(unique(missing_foods), collapse = " _ "),
           error_message = NA_character_,
           .before = 1
         )

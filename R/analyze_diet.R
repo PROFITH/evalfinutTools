@@ -64,12 +64,6 @@ analyze_diet <- function(recall_data, file = NULL) {
   merged_data <- dplyr::left_join(recall_data, food_db, by = c("food_id" = "id"), 
                                   keep = TRUE)
   
-  if (any(is.na(merged_data$energy))) {
-    message(paste0("FILE: ", file))
-    message("MISSING FOOD: ", paste(merged_data$food_name[is.na(merged_data$energy)], collapse = "; "))
-    print("\n")
-  }
-  
   # 2. Validation
   missing_count <- sum(is.na(merged_data$food_name))
   if (missing_count > 0) {
