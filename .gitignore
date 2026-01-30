@@ -2,4 +2,4 @@
 .Rhistory
 .RData
 .Ruserdata
-.inst/extdata/food_composition_data*
+inst/extdata/food_composition_data*
