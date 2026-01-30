@@ -4,7 +4,7 @@
 \alias{process_dataset}
 \title{Batch Process a Directory of Dietary Recall Files}
 \usage{
-process_dataset(folder_path, output_csv = "diet.csv")
+process_dataset(folder_path, output_csv = "diet.csv", format = "euro")
 }
 \arguments{
 \item{folder_path}{String. The root directory containing the participant files.
@@ -12,6 +12,8 @@ The function searches recursively (i.e., it will find files inside subfolders).}
 
 \item{output_csv}{String (Optional). The file path where the final results will be saved.
 Defaults to \code{"diet.csv"}. Set to \code{NULL} to skip saving to disk.}
+
+\item{format}{String. Choose "euro" for Spain/Europe (sep=';', dec=',') or "us" for standard (sep=',', dec='.'). Defaults to "euro".#'}
 }
 \value{
 A master data frame (tibble) where each row represents one participant.
