@@ -88,11 +88,21 @@ process_dataset <- function(folder_path, output_csv = "diet.csv", format = "euro
         return(create_error_row("Skipped", "File contained no food records"))
       }
       
-      # B. Analyze
+      # missing foods in food_db
       missing_foods = NULL
       if (any(!raw_data$D$food_id %in% food_db$id)) {
         missing_foods = c(missing_foods, raw_data$D$food_id[!raw_data$D$food_id %in% food_db$id])
       }
+      
+      # missing nova in food_db
+      missing_nova = NULL
+      foods2inspect = raw_data$D$food_id[raw_data$D$food_id %in% food_db$id]
+      for (foodi in foods2inspect) {
+        index = which(food_db$id == foodi)
+        if (is.na(food_db$NOVA[index])) missing_nova = c(missing_nova, foodi)
+      }
+      
+      # B. Analyze
       analysis <- analyze_diet(raw_data$D, file = file)
       
       # C. Add Metadata
@@ -103,8 +113,9 @@ process_dataset <- function(folder_path, output_csv = "diet.csv", format = "euro
         mutate(
           source_file = file, 
           processing_status = "Success",
-          missing_foods = paste(unique(missing_foods), collapse = " _ "),
           error_message = NA_character_,
+          missing_foods = paste(unique(missing_foods), collapse = " _ "),
+          missing_nova = paste(unique(missing_nova), collapse = " _ "),
           .before = 1
         )
       
