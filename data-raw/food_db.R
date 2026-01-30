@@ -2,7 +2,7 @@ library(readr)
 library(dplyr)
 library(janitor)
 
-food_db_add = data.table::fread("inst/extdata/food_composition_data.csv",
+food_db = data.table::fread("inst/extdata/food_composition_data.csv",
                                 data.table = F)
 
 # 3. Save to package
