@@ -58,10 +58,17 @@
 #'   print(diet_stats$total_daily_kcal)
 #'   print(diet_stats$cena_nova4_perc) # % of calories from UPF at dinner
 #' }
-analyze_diet <- function(recall_data) {
+analyze_diet <- function(recall_data, file = NULL) {
   
   # 1. Merge Recall with Internal Food DB
-  merged_data <- dplyr::left_join(recall_data, food_db, by = c("food_id" = "id"))
+  merged_data <- dplyr::left_join(recall_data, food_db, by = c("food_id" = "id"), 
+                                  keep = TRUE)
+  
+  if (any(is.na(merged_data$energy))) {
+    message(paste0("FILE: ", file))
+    message("MISSING FOOD: ", paste(merged_data$food_name[is.na(merged_data$energy)], collapse = "; "))
+    print("\n")
+  }
   
   # 2. Validation
   missing_count <- sum(is.na(merged_data$food_name))

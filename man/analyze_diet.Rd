@@ -4,7 +4,7 @@
 \alias{analyze_diet}
 \title{Calculate Comprehensive Diet Quality and NOVA Statistics}
 \usage{
-analyze_diet(recall_data)
+analyze_diet(recall_data, file = NULL)
 }
 \arguments{
 \item{recall_data}{A data frame containing the dietary recall data, typically generated

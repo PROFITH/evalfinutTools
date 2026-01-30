@@ -89,7 +89,7 @@ process_dataset <- function(folder_path, output_csv = "diet.csv", format = "euro
       }
       
       # B. Analyze
-      analysis <- analyze_diet(raw_data$D)
+      analysis <- analyze_diet(raw_data$D, file = file)
       
       # C. Add Metadata
       flat_row <- cbind(list2DF(raw_data$H, nrow = 1), analysis)
