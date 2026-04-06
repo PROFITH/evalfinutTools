@@ -76,10 +76,21 @@ analyze_diet <- function(recall_data, file = NULL) {
       kcal = (serving_g / 100) * energy 
     )
   
-  # Complete missing meals/NOVA in the raw data (Optional but good for day-sums)
-  results <- results %>%
-    tidyr::complete(day, meal, fill = list(kcal = 0)) %>%
-    tidyr::complete(day, NOVA, fill = list(kcal = 0))
+  # Complete missing meals/NOVA in the raw data
+  grid <- expand.grid(
+    day = unique(results$day),
+    meal = c("Desayuno", "Media mañana", "Almuerzo",
+             "Merienda", "Cena"),
+    NOVA = 1:4
+  )
+  
+  # Merge data and grid fill with 0s
+  results <- merge(grid, results, by = c("day", "meal", "NOVA"), all.x = TRUE)
+  results$kcal[is.na(results$kcal)] <- 0
+  
+  # results <- results %>%
+  #   tidyr::complete(day, meal, fill = list(kcal = 0)) %>%
+  #   tidyr::complete(day, NOVA, fill = list(kcal = 0))
   
   # Factorize meal and nova
   results$meal = factor(results$meal, 
