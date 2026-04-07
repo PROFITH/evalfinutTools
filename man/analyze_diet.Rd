@@ -2,61 +2,74 @@
 % Please edit documentation in R/analyze_diet.R
 \name{analyze_diet}
 \alias{analyze_diet}
-\title{Calculate Comprehensive Diet Quality and NOVA Statistics}
+\title{Calculate Comprehensive Diet Quality, Nutrient Profiles, and NOVA Statistics}
 \usage{
-analyze_diet(recall_data, file = NULL)
+analyze_diet(recall_data)
 }
 \arguments{
 \item{recall_data}{A data frame containing the dietary recall data, typically generated
-by \code{\link{import_recall_data}}. If supplied manually, it must contain the
-following columns:
+by \code{\link{import_recall_data}}. It must contain:
 \itemize{
-\item \code{food_id}: Unique identifier linking to the internal food database.
-\item \code{serving_g}: Portion size in grams.
-\item \code{day}: The day of the record (e.g., 1, 2, 3).
-\item \code{meal}: Name of the meal (e.g., "Desayuno", "Cena").
-\item \code{NOVA}: The NOVA group classification (1-4).
+\item \code{food_id}: Unique identifier linking to \code{food_db}.
+\item \code{serving_g}: Portion size consumed in grams.
+\item \code{day}: The record day (e.g., 1, 2, 3).
+\item \code{meal}: Name of the meal (e.g., "Desayuno", "Almuerzo").
 }}
+
+\item{food_db}{A data frame containing the BEDCA food composition database.
+Must include \code{id}, \code{NOVA}, and nutrient columns from \code{energy}
+to \code{zinc}.}
 }
 \value{
-A single-row data frame (tibble) containing flattened statistical summaries.
-All column names are lower_snake_case.
+A single-row data frame (tibble).
 }
 \description{
-Calculates total energy intake and examines the distribution of calories across
-different meals and NOVA food processing classifications. The function aggregates
-24-hour recall data, imputes missing values (e.g., skipped meals count as 0 kcal),
-and returns a flattened, single-row summary suitable for regression analysis.
+Calculates mean daily intake for the full suite of BEDCA nutrients (energy through zinc)
+and examines their distribution across different meals and NOVA food processing
+classifications. The function cleans raw character data, imputes missing values
+(skipped meals/missing DB entries count as 0), and returns a flattened,
+single-row summary suitable for regression analysis.
 }
 \details{
 \strong{Methodology:}
-This function calculates the \emph{mean of daily totals}. For every participant, it:
 \enumerate{
-\item Calculates the total energy (kcal) for every specific Day/Meal/NOVA combination.
-\item Imputes \code{0} for any combination not present (e.g., if a participant skipped "Cena" on Day 2, it is recorded as 0 kcal rather than missing).
-\item Averages these daily sums to produce a representative daily intake.
+\item \strong{Data Cleaning:} Converts character-based nutrient strings to numeric
+and replaces empty strings or NAs with \code{0}.
+\item \strong{Scaling:} All nutrients are scaled by \code{(serving_g / 100)}.
+\item \strong{Imputation:} Uses a complete grid of all Day/Meal/NOVA combinations
+to ensure that skipped meals are correctly calculated as \code{0} rather than
+missing in the final means.
+\item \strong{Averaging:} Calculates the \emph{mean of daily totals}. For each
+nutrient, it sums the intake per day and then averages those daily totals
+across the recording period.
 }
 
+\strong{Macro-Energy Ratios:}
+Calculates the percentage of total daily energy derived from major sources using
+standard Atwater factors: Protein (4 kcal/g), Carbohydrates (4 kcal/g),
+Fats (9 kcal/g), Alcohol (7 kcal/g), and Fiber (2 kcal/g).
+
 \strong{Output Structure:}
-The output is a "wide" format data frame with one row per participant. Column names are
-standardized to snake_case using \code{janitor::clean_names()}. The columns follow this pattern:
+The output is a "wide" tibble with one row. Column names are standardized
+to snake_case. Patterns include:
 \itemize{
-\item \code{total_daily_kcal}: Grand mean of daily energy intake.
-\item \code{[meal]_kcal}: Absolute energy for a specific meal (e.g., \code{desayuno_kcal}).
-\item \code{[meal]_perc}: Percent of total daily energy from that meal.
-\item \code{nova[1-4]_kcal}: Absolute energy from a specific NOVA group.
-\item \code{nova[1-4]_perc}: Percent of total daily energy from that NOVA group.
-\item \code{[meal]_nova[1-4]_kcal}: Intersection of Meal and NOVA (e.g., \code{cena_nova4_kcal}).
+\item \code{total_daily_[nutrient]}: Grand mean of daily intake for all nutrients.
+\item \code{perc_kcal_[macro]}: \% of total daily energy from protein, fat, carbs, etc.
+\item \code{[meal]_[nutrient]}: Absolute nutrient intake during a specific meal.
+\item \code{nova[1-4]_[nutrient]}: Absolute nutrient intake from a specific NOVA group.
+\item \code{[meal]_nova[1-4]_kcal}: Absolute energy at the intersection of meal and NOVA.
+\item \code{nova[1-4]_perc_daily}: \% of total daily energy from that NOVA group.
+\item \code{[meal]_nova[1-4]_perc}: \% of a specific meal's energy from that NOVA group.
 }
 }
 \examples{
 \dontrun{
-  # Classic workflow
-  raw_data <- import_recall_data("participant_001.xls")
-  diet_stats <- analyze_diet(raw_data)
+  # Analysis of 24h recall using internal food database
+  diet_stats <- analyze_diet(recall_data = participant_data, food_db = bedca_db)
   
-  # Access specific metrics
-  print(diet_stats$total_daily_kcal)
-  print(diet_stats$cena_nova4_perc) # \% of calories from UPF at dinner
+  # Access total energy and NOVA 4 (ultraprocessed food) contribution
+  diet_stats$total_daily_energy
+  diet_stats$nova4_perc_daily
+  diet_stats$almuerzo_nova4_perc
 }
 }

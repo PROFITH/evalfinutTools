@@ -1,64 +1,77 @@
-#' Calculate Comprehensive Diet Quality and NOVA Statistics
+#' Calculate Comprehensive Diet Quality, Nutrient Profiles, and NOVA Statistics
 #'
 #' @description
-#' Calculates total energy intake and examines the distribution of calories across 
-#' different meals and NOVA food processing classifications. The function aggregates 
-#' 24-hour recall data, imputes missing values (e.g., skipped meals count as 0 kcal), 
-#' and returns a flattened, single-row summary suitable for regression analysis.
+#' Calculates mean daily intake for the full suite of BEDCA nutrients (energy through zinc) 
+#' and examines their distribution across different meals and NOVA food processing 
+#' classifications. The function cleans raw character data, imputes missing values 
+#' (skipped meals/missing DB entries count as 0), and returns a flattened, 
+#' single-row summary suitable for regression analysis.
 #'
 #' @param recall_data A data frame containing the dietary recall data, typically generated 
-#'   by \code{\link{import_recall_data}}. If supplied manually, it must contain the 
-#'   following columns:
+#'   by \code{\link{import_recall_data}}. It must contain:
 #'   \itemize{
-#'     \item \code{food_id}: Unique identifier linking to the internal food database.
-#'     \item \code{serving_g}: Portion size in grams.
-#'     \item \code{day}: The day of the record (e.g., 1, 2, 3).
-#'     \item \code{meal}: Name of the meal (e.g., "Desayuno", "Cena").
-#'     \item \code{NOVA}: The NOVA group classification (1-4).
+#'     \item \code{food_id}: Unique identifier linking to \code{food_db}.
+#'     \item \code{serving_g}: Portion size consumed in grams.
+#'     \item \code{day}: The record day (e.g., 1, 2, 3).
+#'     \item \code{meal}: Name of the meal (e.g., "Desayuno", "Almuerzo").
 #'   }
+#' @param food_db A data frame containing the BEDCA food composition database. 
+#'   Must include \code{id}, \code{NOVA}, and nutrient columns from \code{energy} 
+#'   to \code{zinc}.
 #'
 #' @details
 #' \strong{Methodology:}
-#' This function calculates the \emph{mean of daily totals}. For every participant, it:
 #' \enumerate{
-#'   \item Calculates the total energy (kcal) for every specific Day/Meal/NOVA combination.
-#'   \item Imputes \code{0} for any combination not present (e.g., if a participant skipped "Cena" on Day 2, it is recorded as 0 kcal rather than missing).
-#'   \item Averages these daily sums to produce a representative daily intake.
+#'   \item \strong{Data Cleaning:} Converts character-based nutrient strings to numeric 
+#'   and replaces empty strings or NAs with \code{0}.
+#'   \item \strong{Scaling:} All nutrients are scaled by \code{(serving_g / 100)}.
+#'   \item \strong{Imputation:} Uses a complete grid of all Day/Meal/NOVA combinations 
+#'   to ensure that skipped meals are correctly calculated as \code{0} rather than 
+#'   missing in the final means.
+#'   \item \strong{Averaging:} Calculates the \emph{mean of daily totals}. For each 
+#'   nutrient, it sums the intake per day and then averages those daily totals 
+#'   across the recording period.
 #' }
 #' 
-#' 
+#' \strong{Macro-Energy Ratios:}
+#' Calculates the percentage of total daily energy derived from major sources using 
+#' standard Atwater factors: Protein (4 kcal/g), Carbohydrates (4 kcal/g), 
+#' Fats (9 kcal/g), Alcohol (7 kcal/g), and Fiber (2 kcal/g).
 #'
 #' \strong{Output Structure:}
-#' The output is a "wide" format data frame with one row per participant. Column names are 
-#' standardized to snake_case using \code{janitor::clean_names()}. The columns follow this pattern:
+#' The output is a "wide" tibble with one row. Column names are standardized 
+#' to snake_case. Patterns include:
 #' \itemize{
-#'   \item \code{total_daily_kcal}: Grand mean of daily energy intake.
-#'   \item \code{[meal]_kcal}: Absolute energy for a specific meal (e.g., \code{desayuno_kcal}).
-#'   \item \code{[meal]_perc}: Percent of total daily energy from that meal.
-#'   \item \code{nova[1-4]_kcal}: Absolute energy from a specific NOVA group.
-#'   \item \code{nova[1-4]_perc}: Percent of total daily energy from that NOVA group.
-#'   \item \code{[meal]_nova[1-4]_kcal}: Intersection of Meal and NOVA (e.g., \code{cena_nova4_kcal}).
+#'   \item \code{total_daily_[nutrient]}: Grand mean of daily intake for all nutrients.
+#'   \item \code{perc_kcal_[macro]}: % of total daily energy from protein, fat, carbs, etc.
+#'   \item \code{[meal]_[nutrient]}: Absolute nutrient intake during a specific meal.
+#'   \item \code{nova[1-4]_[nutrient]}: Absolute nutrient intake from a specific NOVA group.
+#'   \item \code{[meal]_nova[1-4]_kcal}: Absolute energy at the intersection of meal and NOVA.
+#'   \item \code{nova[1-4]_perc_daily}: % of total daily energy from that NOVA group.
+#'   \item \code{[meal]_nova[1-4]_perc}: % of a specific meal's energy from that NOVA group.
 #' }
 #'
-#' @return A single-row data frame (tibble) containing flattened statistical summaries. 
-#'   All column names are lower_snake_case.
+#' @return A single-row data frame (tibble).
 #'
 #' @import dplyr
 #' @import tidyr
+#' @importFrom rlang !! sym
+#' @importFrom magrittr %>%
+#' @importFrom stats expand.grid
 #' @importFrom janitor clean_names
 #' @export
 #'
 #' @examples
 #' \dontrun{
-#'   # Classic workflow
-#'   raw_data <- import_recall_data("participant_001.xls")
-#'   diet_stats <- analyze_diet(raw_data)
+#'   # Analysis of 24h recall using internal food database
+#'   diet_stats <- analyze_diet(recall_data = participant_data, food_db = bedca_db)
 #'   
-#'   # Access specific metrics
-#'   print(diet_stats$total_daily_kcal)
-#'   print(diet_stats$cena_nova4_perc) # % of calories from UPF at dinner
+#'   # Access total energy and NOVA 4 (ultraprocessed food) contribution
+#'   diet_stats$total_daily_energy
+#'   diet_stats$nova4_perc_daily
+#'   diet_stats$almuerzo_nova4_perc
 #' }
-analyze_diet <- function(recall_data, file = NULL) {
+analyze_diet <- function(recall_data) {
   
   # 1. Merge Recall with Internal Food DB
   merged_data <- dplyr::left_join(recall_data, food_db, by = c("food_id" = "id"), 
@@ -70,110 +83,137 @@ analyze_diet <- function(recall_data, file = NULL) {
     warning(sprintf("%d items found in recall with no matching Food ID in database.", missing_count))
   }
   
-  # 3. Calculations (Ensure columns match your data, e.g., grams vs serving_g)
-  results <- merged_data %>%
-    mutate(
-      kcal = (serving_g / 100) * energy 
-    )
+  # 3. Pre-processing: Clean Database Characters & Replace DB NAs
+  nutrient_cols_base <- colnames(food_db)[12:54]
   
-  # Complete missing meals/NOVA in the raw data
+  results <- merged_data %>%
+    mutate(across(all_of(nutrient_cols_base), ~ as.numeric(as.character(.x)))) %>%
+    mutate(across(all_of(nutrient_cols_base), ~ tidyr::replace_na(.x, 0)))
+  
+  # 4. Expansion: Complete missing meals/NOVA in the raw data
   grid <- expand.grid(
     day = unique(results$day),
-    meal = c("Desayuno", "Media mañana", "Almuerzo",
-             "Merienda", "Cena"),
+    meal = c("Desayuno", "Media mañana", "Almuerzo", "Merienda", "Cena"),
     NOVA = 1:4
   )
   
-  # Merge data and grid fill with 0s
-  results <- merge(grid, results, by = c("day", "meal", "NOVA"), all.x = TRUE)
-  results$kcal[is.na(results$kcal)] <- 0
+  # Merge data and grid
+  # IMPORTANT: We use left_join or merge(all.x=T), then immediately zero-out NAs
+  results_complete <- merge(grid, results, by = c("day", "meal", "NOVA"), all.x = TRUE)
   
-  # results <- results %>%
-  #   tidyr::complete(day, meal, fill = list(kcal = 0)) %>%
-  #   tidyr::complete(day, NOVA, fill = list(kcal = 0))
+  # 5. Calculation & Unit Renaming
+  results_complete <- results_complete %>%
+    mutate(
+      serving_g = tidyr::replace_na(serving_g, 0),
+      across(all_of(nutrient_cols_base), ~ tidyr::replace_na(.x, 0))
+    ) %>%
+    # Perform Gram-scaling
+    mutate(across(all_of(nutrient_cols_base), ~ (serving_g / 100) * .x)) %>%
+    # Rename columns with units
+    rename_with(.cols = all_of(nutrient_cols_base), .fn = function(x) {
+      case_when(
+        x == "energy" ~ paste0(x, "_kcal"),
+        x %in% c("vitaminA", "vitaminD", "folateTotal", "biotin", "vitaminB12", "iodide", "seleniumTotal") ~ paste0(x, "_ug"),
+        x %in% c("cholesterol", "vitaminE", "vitaminC", "niacinEqTotal", "vitaminB5", "riboflavin", "tiamin", "vitaminB6Total", 
+                 "calcium", "ironTotal", "potassium", "magnesium", "sodium", "phosphorus", "zinc") ~ paste0(x, "_mg"),
+        TRUE ~ paste0(x, "_g") 
+      )
+    }) %>%
+    mutate(meal = factor(meal, 
+                         levels = c("Desayuno", "Media mañana", "Almuerzo", "Merienda", "Cena"),
+                         labels = c("desayuno", "media_manana", "almuerzo", "merienda", "cena")))
   
-  # Factorize meal and nova
-  results$meal = factor(results$meal, 
-                        levels = c("Desayuno", "Media mañana", "Almuerzo",
-                                   "Merienda", "Cena"),
-                        labels = c("desayuno", "media manana", "almuerzo",
-                                   "merienda", "cena"))
-
-  # 4. Aggregations
+  # Update nutrient_cols to the now-renamed columns
+  nutrient_cols <- setdiff(colnames(results_complete), 
+                           c("day", "meal", "NOVA", "food_id", "food_name", "serving_g", 
+                             "id", "version", "name", "foodGroup", "breakfast", "middaySnack", 
+                             "lunch", "afternoonSnack", "dinner", "afterDinner", "user", 
+                             "fecha_creacion", "fecha_modificacion", "usuario_creacion", 
+                             "usuario_modificacion", "origin", "old_id", "activo", "order"))
   
-  # Energy per day
-  kcal_day <- aggregate(kcal ~ day, data = results, FUN = sum, na.rm = TRUE)
-  kcal_mean <- mean(kcal_day[,2])
+  # --- Aggregations (Mean of Daily Totals) ---
   
-  # Energy per meal
-  kcal_meal_day <- aggregate(kcal ~ meal*day, data = results, FUN = sum, na.rm = TRUE)
-  kcal_meal_mean <- aggregate(kcal ~ meal, data = kcal_meal_day, FUN = mean, na.rm = TRUE)
-  kcal_meal_mean$perc <- kcal_meal_mean$kcal / kcal_mean * 100
+  # A. TOTAL DAILY
+  daily_sums <- results_complete %>%
+    group_by(day) %>%
+    summarise(across(all_of(nutrient_cols), sum), .groups = "drop")
   
-  # Energy per NOVA
-  kcal_nova_day <- aggregate(kcal ~ NOVA*day, data = results, FUN = sum, na.rm = TRUE)
-  kcal_nova_mean <- aggregate(kcal ~ NOVA, data = kcal_nova_day, FUN = mean, na.rm = TRUE)
-  kcal_nova_mean$perc <- kcal_nova_mean$kcal / kcal_mean * 100
+  daily_totals <- daily_sums %>%
+    summarise(across(all_of(nutrient_cols), mean)) %>%
+    rename_with(~ paste0("total_daily_", .x))
   
-  # Energy per NOVA * Meal
-  kcal_nova_meal_day <- aggregate(kcal ~ NOVA*meal*day, data = results, FUN = sum, na.rm = TRUE)
-  kcal_nova_meal_mean <- aggregate(kcal ~ NOVA*meal, data = kcal_nova_meal_day, FUN = mean, na.rm = TRUE)
+  # B. BY MEAL
+  meal_stats <- results_complete %>%
+    group_by(day, meal) %>%
+    summarise(across(all_of(nutrient_cols), sum), .groups = "drop") %>%
+    group_by(meal) %>%
+    summarise(across(all_of(nutrient_cols), mean), .groups = "drop")
   
-  # Merge with meal totals to get %
-  kcal_nova_meal_mean <- merge(
-    kcal_nova_meal_mean,
-    kcal_meal_mean[, c("meal", "kcal")],
-    by = "meal",
-    suffixes = c("", "_total_meal")
-  )
-  kcal_nova_meal_mean$perc <- kcal_nova_meal_mean$kcal / kcal_nova_meal_mean$kcal_total_meal * 100
+  # C. BY NOVA
+  nova_stats <- results_complete %>%
+    group_by(day, NOVA) %>%
+    summarise(across(all_of(nutrient_cols), sum), .groups = "drop") %>%
+    group_by(NOVA) %>%
+    summarise(across(all_of(nutrient_cols), mean), .groups = "drop")
   
-  # --- 4.5. THE FIX: Force Missing Combinations ---
-  # This ensures "Desayuno NOVA 1" exists as 0 even if never consumed.
-  kcal_nova_meal_mean <- kcal_nova_meal_mean %>%
-    tidyr::as_tibble() %>%
-    tidyr::complete(
-      meal, 
-      NOVA = c(1, 2, 3, 4), # Explicitly look for groups 1, 2, 3, 4
-      fill = list(kcal = 0, perc = 0)
-    )
+  # D. INTERACTION: MEAL x NOVA (Using Energy specifically)
+  energy_col <- grep("energy_kcal", nutrient_cols, value = TRUE)
+  meal_nova_interaction <- results_complete %>%
+    group_by(day, meal, NOVA) %>%
+    summarise(energy = sum(!!sym(energy_col)), .groups = "drop") %>%
+    group_by(meal, NOVA) %>%
+    summarise(mean_energy = mean(energy), .groups = "drop")
   
-  # 5. Flattening (Structure)
+  # --- 6. PERCENTAGE CALCULATIONS ---
   
-  # Total
-  row_total <- data.frame(total_daily_kcal = as.numeric(kcal_mean))
+  # Logic updated to use the new Unit-Suffixed column names
+  macro_perc <- daily_totals %>%
+    mutate(
+      perc_kcal_protein = (total_daily_proteinTotal_g * 4) / total_daily_energy_kcal * 100,
+      perc_kcal_carbs   = (total_daily_carbohydrates_g * 4) / total_daily_energy_kcal * 100,
+      perc_kcal_fat     = (total_daily_fatTotal_g * 9) / total_daily_energy_kcal * 100,
+      perc_kcal_alcohol = (total_daily_alcohol_g * 7) / total_daily_energy_kcal * 100,
+      perc_kcal_fiber   = (total_daily_fiberTotal_g * 2) / total_daily_energy_kcal * 100,
+      perc_kcal_residual = 100 - (perc_kcal_protein + perc_kcal_carbs + 
+                                    perc_kcal_fat + perc_kcal_alcohol + perc_kcal_fiber)
+    ) %>%
+    dplyr::select(starts_with("perc_kcal"))
   
-  # By Meal
-  row_meal <- kcal_meal_mean %>%
-    tidyr::pivot_wider(
-      names_from = meal, 
-      values_from = c(kcal, perc),
-      names_glue = "{meal}_{.value}"
-    )
+  # II. NOVA % of Total Daily Kcal
+  nova_daily_perc <- nova_stats %>%
+    mutate(perc_total_daily_kcal = !!sym(energy_col) / sum(nova_stats[[energy_col]]) * 100) %>%
+    mutate(label = paste0("nova", NOVA, "_perc_daily")) %>%
+    dplyr::select(label, perc_total_daily_kcal) %>%
+    tidyr::pivot_wider(names_from = label, values_from = perc_total_daily_kcal)
   
-  # By NOVA
-  row_nova <- kcal_nova_mean %>%
-    tidyr::pivot_wider(
-      names_from = NOVA,
-      values_from = c(kcal, perc),
-      names_glue = "NOVA{NOVA}_{.value}"
-    )
+  # III. NOVA % of Specific Meal Kcal
+  meal_nova_perc <- meal_nova_interaction %>%
+    left_join(meal_stats %>% dplyr::select(meal, total_meal_energy = !!sym(energy_col)), by = "meal") %>%
+    mutate(perc_of_meal_kcal = (mean_energy / total_meal_energy) * 100) %>%
+    mutate(perc_of_meal_kcal = tidyr::replace_na(perc_of_meal_kcal, 0)) %>%
+    mutate(label = paste0(meal, "_nova", NOVA, "_perc")) %>%
+    dplyr::select(label, perc_of_meal_kcal) %>%
+    tidyr::pivot_wider(names_from = label, values_from = perc_of_meal_kcal)
   
-  # By NOVA + Meal
-  row_nova_meal <- kcal_nova_meal_mean %>%
-    dplyr::mutate(combo_label = paste0(meal, "_NOVA", NOVA)) %>%
-    # Select ONLY the columns to pivot so we get 1 row
-    dplyr::select(combo_label, kcal, perc) %>%
-    tidyr::pivot_wider(
-      names_from = combo_label,
-      values_from = c(kcal, perc),
-      names_glue = "{combo_label}_{.value}"
-    )
+  # --- FLATTENING AND FINAL JOIN ---
   
-  # Combine
-  final_single_row <- dplyr::bind_cols(row_total, row_meal, row_nova, row_nova_meal)
-  final_single_row = janitor::clean_names(final_single_row)
+  meal_stats_wide <- meal_stats %>%
+    tidyr::pivot_wider(names_from = meal, values_from = all_of(nutrient_cols), names_glue = "{meal}_{.value}")
   
-  # Return the correct object
-  return(final_single_row)
+  nova_stats_wide <- nova_stats %>%
+    mutate(NOVA = paste0("nova", NOVA)) %>%
+    tidyr::pivot_wider(names_from = NOVA, values_from = all_of(nutrient_cols), names_glue = "{NOVA}_{.value}")
+  
+  interaction_wide <- meal_nova_interaction %>%
+    mutate(label = paste0(meal, "_nova", NOVA, "_kcal")) %>%
+    dplyr::select(label, mean_energy) %>%
+    tidyr::pivot_wider(names_from = label, values_from = mean_energy)
+  
+  final_row <- dplyr::bind_cols(
+    daily_totals, macro_perc, meal_stats_wide, nova_stats_wide, 
+    interaction_wide, nova_daily_perc, meal_nova_perc
+  ) %>%
+    janitor::clean_names()
+  
+  return(final_row)
 }

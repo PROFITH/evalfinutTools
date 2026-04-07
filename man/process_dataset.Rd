@@ -4,48 +4,32 @@
 \alias{process_dataset}
 \title{Batch Process a Directory of Dietary Recall Files}
 \usage{
-process_dataset(folder_path, output_csv = "diet.csv", format = "euro")
+process_dataset(
+  folder_path,
+  output_folder = "Diet_Analysis_Results",
+  format = "us"
+)
 }
 \arguments{
-\item{folder_path}{String. The root directory containing the participant files.
-The function searches recursively (i.e., it will find files inside subfolders).}
+\item{folder_path}{String. Root directory containing participant files (.xls, .xlsx, .csv).}
 
-\item{output_csv}{String (Optional). The file path where the final results will be saved.
-Defaults to \code{"diet.csv"}. Set to \code{NULL} to skip saving to disk.}
+\item{output_folder}{String. Name of the folder to create for results. Defaults to "Diet_Analysis_Results".}
 
-\item{format}{String. Choose "euro" for Spain/Europe (sep=';', dec=',') or "us" for standard (sep=',', dec='.'). Defaults to "euro".#'}
+\item{format}{String. "euro" (semicolon/comma) or "us" (comma/dot). Defaults to "us".}
 }
 \value{
-A master data frame (tibble) where each row represents one participant.
-The columns include:
-\itemize{
-\item \code{source_file}: Name of the original file.
-\item \code{code, name, sex, age...}: Participant metadata from the file header.
-\item \code{total_daily_kcal}: Mean daily energy intake.
-\item \code{[meal]_nova[1-4]_kcal}: Detailed diet composition columns.
-}
-The function returns this data frame invisibly.
+A master data frame (tibble) returned invisibly.
 }
 \description{
-Automates the entire data pipeline for a study. This function recursively searches a
-folder for all compatible dietary recall files (.xls, .xlsx, .csv), processes them individually
-to calculate NOVA and nutrient statistics, and merges them into a single master dataset.
-It includes robust error handling and a real-time progress bar.
+Automates the entire data pipeline for a study. This function scans a folder
+for recall files, processes them, and exports a "Results Package" containing
+the master dataset, a codebook for variable meanings, and a README audit file.
 }
 \details{
-\strong{Workflow:}
-\enumerate{
-\item \strong{Discovery:} Scans \code{folder_path} for all files matching .xls, .xlsx, or .csv (case insensitive).
-\item \strong{Processing:} Iterates through each file:
+\strong{Exported Files:}
 \itemize{
-\item Parses metadata (Age, Sex, etc.) and recall data using \code{\link{import_recall_data}}.
-\item Calculates diet quality and NOVA metrics using \code{\link{analyze_diet}}.
+\item \code{analysis_data.csv}: The master dataset with all participants.
+\item \code{codebook.csv}: Automatic dictionary mapping variable names to units and descriptions.
+\item \code{README.txt}: Technical summary, software versions, and legal disclaimer.
 }
-\item \strong{Merging:} Combines participant metadata (header info) with their calculated diet statistics into a single wide-format row.
-\item \strong{Output:} Writes the final merged data frame to a CSV file using \code{data.table::fwrite} for speed.
-}
-
-\strong{Error Handling:}
-If a specific file is corrupted or empty, the function will catch the error, print a warning
-to the console, and continue processing the remaining files without crashing.
 }

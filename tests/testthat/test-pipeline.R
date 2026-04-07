@@ -48,15 +48,15 @@ test_that("analyze_diet computes correct energy and imputes zeros", {
   expect_equal(nrow(stats), 1) # Should be 1 flattened row
   
   # 2. Math Check
-  expect_equal(stats$total_daily_kcal, 1646.5, tolerance = 0.01)
+  expect_equal(stats$total_daily_energy_kcal, 1646.5, tolerance = 0.01)
   
   # 3. Check Imputation (Missing Meals)
-  expect_true("desayuno_kcal" %in% names(stats))
-  expect_equal(stats$desayuno_kcal, 201.8)
+  expect_true("desayuno_energy_kcal" %in% names(stats))
+  expect_equal(stats$desayuno_energy_kcal, 201.8)
   
   # 4. Check NOVA columns
-  expect_true("nova2_kcal" %in% names(stats))
-  expect_gt(stats$nova2_kcal, 0) 
+  expect_true("nova2_energy_kcal" %in% names(stats))
+  expect_gt(stats$nova2_energy_kcal, 0) 
 })
 
 # --- TEST 3: BATCH PROCESSING ---
@@ -68,7 +68,9 @@ test_that("process_dataset iterates through folder and merges results", {
   
   # Run Batch (Output CSV disabled for test)
   # Suppress messages to keep test console clean
-  master_df <- suppressMessages(process_dataset(batch_dir, output_csv = NULL))
+  master_df <- suppressMessages(
+    process_dataset(folder_path = batch_dir)
+  )
   
   # --- VALIDATION ---
   
@@ -87,4 +89,9 @@ test_that("process_dataset iterates through folder and merges results", {
   # 4. Check consistency
   # Both rows should have 'total_daily_kcal'
   expect_false(any(is.na(master_df$total_daily_kcal)))
+  
+  # Remove generated files
+  if (dir.exists("Diet_Analysis_Results")) {
+    unlink("Diet_Analysis_Results", recursive = TRUE)
+  }
 })
