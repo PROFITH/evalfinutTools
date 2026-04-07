@@ -111,7 +111,7 @@ import_intake_profile <- function(file) {
   # 4. Generate wide segments
   wide_intake <- profile_clean %>%
     dplyr::select(name_en, val) %>%
-    tidyr::pivot_wider(names_from = name_en, values_from = val, names_prefix = "intake_")
+    tidyr::pivot_wider(names_from = name_en, values_from = val, names_prefix = "total_daily_")
   
   wide_rec <- profile_clean %>%
     dplyr::select(name_en, rec_low, rec_high) %>%
@@ -133,7 +133,7 @@ import_intake_profile <- function(file) {
   
   for (nut in nutrients) {
     nut_pattern <- c(
-      paste0("intake_", nut),
+      paste0("total_daily_", nut),
       paste0("rec_low_", nut),
       paste0("rec_high_", nut),
       paste0("perc_low_", nut),
