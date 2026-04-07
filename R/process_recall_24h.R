@@ -24,7 +24,7 @@
 #' @importFrom utils txtProgressBar setTxtProgressBar write.csv packageVersion
 #' @importFrom magrittr %>%
 #' @export
-process_dataset <- function(folder_path, output_folder = "Diet_Analysis_Results", format = "us") {
+process_recall_24h <- function(folder_path, output_folder = "Diet_Analysis_Results", format = "us") {
   
   # 1. Discovery
   files <- list.files(path = folder_path, pattern = "\\.(xls|xlsx|csv)$", 
@@ -43,7 +43,7 @@ process_dataset <- function(folder_path, output_folder = "Diet_Analysis_Results"
       raw_data <- import_recall_data(file)
       if (nrow(raw_data$D) == 0) return(dplyr::tibble(source_file = basename(file), processing_status = "Skipped"))
       
-      analysis <- analyze_diet(raw_data$D)
+      analysis <- analyze_recalls(raw_data$D)
       flat_row <- cbind(list2DF(raw_data$H, nrow = 1), analysis)
       
       flat_row %>%
@@ -92,16 +92,55 @@ process_dataset <- function(folder_path, output_folder = "Diet_Analysis_Results"
     # --- C. Create README ---
     pkg_ver <- tryCatch(as.character(packageVersion("evalfinutTools")), error = function(e) "Development")
     readme_text <- c(
-      "DIETARY ANALYSIS REPORT - evalfinutTools",
-      paste("Generated on:", Sys.Date()),
-      "------------------------------------------",
-      paste("Software:", R.version$version.string),
-      paste("Package: evalfinutTools v", pkg_ver),
-      "------------------------------------------",
-      "DISCLAIMER:",
-      "This data is for research purposes only. Developers are not responsible",
-      "for clinical decisions made based on these outputs.",
-      "Methodology: Mean of daily totals with 0-imputation for skipped meals."
+      "==========================================================================",
+      "             RAW 24-HOUR RECALL ANALYSIS - evalfinutTools                 ",
+      "==========================================================================",
+      paste("Generated on: ", Sys.Date()),
+      paste("Software:     ", R.version$version.string),
+      paste("Package:      evalfinutTools v", pkg_ver),
+      "--------------------------------------------------------------------------",
+      "",
+      "1. FOLDER CONTENTS",
+      "   - analysis_data.csv: The master dataset containing all participants.",
+      "   - codebook.csv:      A dictionary defining every variable and its units.",
+      "   - README.txt:        This navigation guide.",
+      "",
+      "2. DATA STRUCTURE & COLUMN PREFIXES",
+      "   This dataset calculates nutrient intake at three different levels:",
+      "",
+      "   A. DAILY TOTALS (Prefix: total_daily_)",
+      "      The grand mean of intake across all recorded days.",
+      "      Example: 'total_daily_energy_kcal' is the average daily calories.",
+      "",
+      "   B. BY MEAL (Prefixes: desayuno_, almuerzo_, etc.)",
+      "      The average intake contributed by specific meals.",
+      "      Example: 'cena_protein_total_g' is the mean protein intake at dinner.",
+      "",
+      "   C. BY NOVA GROUP (Prefixes: nova1_, nova2_, nova3_, nova4_)",
+      "      Intake categorized by the NOVA food processing classification.",
+      "      Example: 'nova4_energy_kcal' is the energy from ultra-processed foods.",
+      "",
+      "3. PERCENTAGE & RATIO COLUMNS",
+      "   - perc_kcal_[macro]: Percentage of total daily energy from protein, fat, etc.",
+      "     Calculated using Atwater factors (4-4-9-7-2).",
+      "   - nova[1-4]_perc_daily: The % of total daily calories from that NOVA group.",
+      "   - [meal]_nova[1-4]_perc: The % of that specific meal's calories from that",
+      "     NOVA group (e.g., 'merienda_nova4_perc' is the % of UPF at snack time).",
+      "",
+      "4. METHODOLOGY & DATA CLEANING",
+      "   - ZERO IMPUTATION: If a participant skipped a meal or did not consume a",
+      "     specific NOVA group, it is recorded as 0. This ensures the 'Mean of Daily",
+      "     Totals' is not artificially inflated by missing records.",
+      "   - UNIT STANDARDIZATION: All nutrients include their units in the column",
+      "     name (g, mg, ug, kcal) to ensure clarity for statistical modeling.",
+      "   - DATABASE: Calculations are performed using the BEDCA food composition",
+      "     reference via the internal 'food_db'.",
+      "",
+      "5. LEGAL DISCLAIMER",
+      "   This data was batch-processed automatically. Researchers should manually",
+      "   verify outliers. The developers of 'evalfinutTools' are not responsible",
+      "   for clinical or research interpretations derived from this output.",
+      "=========================================================================="
     )
     writeLines(readme_text, file.path(output_folder, "README.txt"))
     

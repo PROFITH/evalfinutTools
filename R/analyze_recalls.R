@@ -57,21 +57,20 @@
 #' @import tidyr
 #' @importFrom rlang !! sym
 #' @importFrom magrittr %>%
-#' @importFrom stats expand.grid
 #' @importFrom janitor clean_names
 #' @export
 #'
 #' @examples
 #' \dontrun{
 #'   # Analysis of 24h recall using internal food database
-#'   diet_stats <- analyze_diet(recall_data = participant_data, food_db = bedca_db)
+#'   diet_stats <- analyze_recalls(recall_data = participant_data, food_db = bedca_db)
 #'   
 #'   # Access total energy and NOVA 4 (ultraprocessed food) contribution
 #'   diet_stats$total_daily_energy
 #'   diet_stats$nova4_perc_daily
 #'   diet_stats$almuerzo_nova4_perc
 #' }
-analyze_diet <- function(recall_data) {
+analyze_recalls <- function(recall_data) {
   
   # 1. Merge Recall with Internal Food DB
   merged_data <- dplyr::left_join(recall_data, food_db, by = c("food_id" = "id"), 
@@ -109,14 +108,50 @@ analyze_diet <- function(recall_data) {
     ) %>%
     # Perform Gram-scaling
     mutate(across(all_of(nutrient_cols_base), ~ (serving_g / 100) * .x)) %>%
-    # Rename columns with units
+    # Harmonized English Renaming
     rename_with(.cols = all_of(nutrient_cols_base), .fn = function(x) {
+      new_name <- case_when(
+        x == "energy" ~ "energy",
+        x == "proteinTotal" ~ "protein",
+        x == "fatTotal" ~ "fat_total",
+        x == "carbohydrates" ~ "carbohydrates",
+        x == "sugar" ~ "sugar",
+        x == "fiberTotal" ~ "fiber",
+        x == "alcohol" ~ "alcohol",
+        x == "water" ~ "water",
+        x == "cholesterol" ~ "cholesterol",
+        x == "vitaminA" ~ "vitamin_a",
+        x == "vitaminD" ~ "vitamin_d",
+        x == "vitaminE" ~ "vitamin_e",
+        x == "vitaminC" ~ "vitamin_c",
+        x == "folateTotal" ~ "folate",
+        x == "biotin" ~ "biotin",
+        x == "tiamin" ~ "thiamin",
+        x == "riboflavin" ~ "riboflavin",
+        x == "niacinEqTotal" ~ "niacin",
+        x == "vitaminB5" ~ "vitamin_b5",
+        x == "vitaminB6Total" ~ "vitamin_b6",
+        x == "vitaminB12" ~ "vitamin_b12",
+        x == "calcium" ~ "calcium",
+        x == "ironTotal" ~ "iron",
+        x == "potassium" ~ "potassium",
+        x == "magnesium" ~ "magnesium",
+        x == "sodium" ~ "sodium",
+        x == "phosphorus" ~ "phosphorus",
+        x == "iodide" ~ "iodide",
+        x == "seleniumTotal" ~ "selenium",
+        x == "zinc" ~ "zinc",
+        grepl("^fattyAcid", x) ~ janitor::make_clean_names(gsub("fattyAcid", "fatty_acid_", x)),
+        TRUE ~ x
+      )
+      
+      # Append Unit
       case_when(
-        x == "energy" ~ paste0(x, "_kcal"),
-        x %in% c("vitaminA", "vitaminD", "folateTotal", "biotin", "vitaminB12", "iodide", "seleniumTotal") ~ paste0(x, "_ug"),
-        x %in% c("cholesterol", "vitaminE", "vitaminC", "niacinEqTotal", "vitaminB5", "riboflavin", "tiamin", "vitaminB6Total", 
-                 "calcium", "ironTotal", "potassium", "magnesium", "sodium", "phosphorus", "zinc") ~ paste0(x, "_mg"),
-        TRUE ~ paste0(x, "_g") 
+        new_name == "energy" ~ paste0(new_name, "_kcal"),
+        new_name %in% c("vitamin_a", "vitamin_d", "folate", "biotin", "vitamin_b12", "iodide", "selenium") ~ paste0(new_name, "_ug"),
+        new_name %in% c("iron", "calcium", "potassium", "magnesium", "sodium", "phosphorus", "zinc", 
+                        "cholesterol", "vitamin_e", "vitamin_c", "niacin", "vitamin_b5", "riboflavin", "thiamin", "vitamin_b6") ~ paste0(new_name, "_mg"),
+        TRUE ~ paste0(new_name, "_g")
       )
     }) %>%
     mutate(meal = factor(meal, 
@@ -124,12 +159,7 @@ analyze_diet <- function(recall_data) {
                          labels = c("desayuno", "media_manana", "almuerzo", "merienda", "cena")))
   
   # Update nutrient_cols to the now-renamed columns
-  nutrient_cols <- setdiff(colnames(results_complete), 
-                           c("day", "meal", "NOVA", "food_id", "food_name", "serving_g", 
-                             "id", "version", "name", "foodGroup", "breakfast", "middaySnack", 
-                             "lunch", "afternoonSnack", "dinner", "afterDinner", "user", 
-                             "fecha_creacion", "fecha_modificacion", "usuario_creacion", 
-                             "usuario_modificacion", "origin", "old_id", "activo", "order"))
+  nutrient_cols <- grep("_g$|_mg$|_ug$|_kcal$", colnames(results_complete), value = TRUE)
   
   # --- Aggregations (Mean of Daily Totals) ---
   
@@ -169,11 +199,11 @@ analyze_diet <- function(recall_data) {
   # Logic updated to use the new Unit-Suffixed column names
   macro_perc <- daily_totals %>%
     mutate(
-      perc_kcal_protein = (total_daily_proteinTotal_g * 4) / total_daily_energy_kcal * 100,
+      perc_kcal_protein = (total_daily_protein_g * 4) / total_daily_energy_kcal * 100,
       perc_kcal_carbs   = (total_daily_carbohydrates_g * 4) / total_daily_energy_kcal * 100,
-      perc_kcal_fat     = (total_daily_fatTotal_g * 9) / total_daily_energy_kcal * 100,
+      perc_kcal_fat     = (total_daily_fat_total_g * 9) / total_daily_energy_kcal * 100,
       perc_kcal_alcohol = (total_daily_alcohol_g * 7) / total_daily_energy_kcal * 100,
-      perc_kcal_fiber   = (total_daily_fiberTotal_g * 2) / total_daily_energy_kcal * 100,
+      perc_kcal_fiber   = (total_daily_fiber_g * 2) / total_daily_energy_kcal * 100,
       perc_kcal_residual = 100 - (perc_kcal_protein + perc_kcal_carbs + 
                                     perc_kcal_fat + perc_kcal_alcohol + perc_kcal_fiber)
     ) %>%
