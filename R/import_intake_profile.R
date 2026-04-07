@@ -11,10 +11,10 @@ import_intake_profile <- function(file) {
   # 1. Metadata (Row 1)
   header <- readxl::read_excel(file, n_max = 1, col_names = TRUE)
   H <- data.frame(
-    code = header[[1]], 
-    age = header[[5]], 
-    sex = header[[4]],
-    activity_cal = header[[6]],
+    code         = as.character(header[[1]]), 
+    age          = as.numeric(as.character(header[[5]])), 
+    sex          = as.character(header[[4]]),
+    activity_cal = as.numeric(as.character(header[[6]])),
     stringsAsFactors = FALSE
   )
   

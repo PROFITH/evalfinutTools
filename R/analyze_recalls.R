@@ -86,7 +86,17 @@ analyze_recalls <- function(recall_data) {
   nutrient_cols_base <- colnames(food_db)[12:54]
   
   results <- merged_data %>%
-    mutate(across(all_of(nutrient_cols_base), ~ as.numeric(as.character(.x)))) %>%
+    mutate(across(all_of(nutrient_cols_base), ~ {
+      # 1. Convert to character
+      x <- as.character(.x)
+      
+      # 2. Clean common non-numeric symbols found in BEDCA/Metabol
+      # Replaces "<...", "traces", "tr", "N.D." with "0"
+      x <- gsub("<.*|traces|tr|N\\.D\\.|n\\.d\\.|\\s+", "0", x)
+      
+      # 3. Suppress the warning only for the final numeric conversion
+      suppressWarnings(as.numeric(x))
+    })) %>%
     mutate(across(all_of(nutrient_cols_base), ~ tidyr::replace_na(.x, 0)))
   
   # 4. Expansion: Complete missing meals/NOVA in the raw data
