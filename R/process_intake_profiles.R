@@ -50,7 +50,7 @@ process_intake_profiles <- function(folder_path, output_folder = "Intake_Profile
   
   # B. Condense identical Low/High ranges
   # Get list of nutrients based on intake columns
-  nutrients <- gsub("intake_", "total_daily_", grep("^intake_", names(master_table), value = TRUE))
+  nutrients <- gsub("total_daily_", "", grep("^total_daily_", names(master_table), value = TRUE))
   
   for (nut in nutrients) {
     low_col   <- paste0("rec_low_", nut)
@@ -90,10 +90,10 @@ process_intake_profiles <- function(folder_path, output_folder = "Intake_Profile
         description = dplyr::case_when(
           variable == "source_file" ~ "Original file name",
           grepl("^total_daily_", variable) ~ "Nutrient intake estimate",
-          grepl("^rec_", variable) ~ "Nutrient recommendation (Single target)",
+          grepl("^rec_", variable) ~ "Nutrient recommendation",
           grepl("^rec_low_", variable) ~ "Lower bound of recommended range",
           grepl("^rec_high_", variable) ~ "Upper bound of recommended range",
-          grepl("^perc_", variable) ~ "Percentage of adequacy (Single target)",
+          grepl("^perc_", variable) ~ "Percentage of adequacy",
           grepl("^perc_low_", variable) ~ "Adequacy relative to lower recommendation",
           grepl("^perc_high_", variable) ~ "Adequacy relative to upper recommendation",
           TRUE ~ "Participant metadata"
